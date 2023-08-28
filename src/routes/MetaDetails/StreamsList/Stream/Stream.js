@@ -3,13 +3,13 @@
 const React = require('react');
 const PropTypes = require('prop-types');
 const classnames = require('classnames');
-const Icon = require('@stremio/stremio-icons/dom');
+const { default: Icon } = require('@stremio/stremio-icons/react');
 const { Button, Image, PlayIconCircleCentered, useProfile, platform, useStreamingServer, useToast } = require('stremio/common');
 const { useServices } = require('stremio/services');
 const StreamPlaceholder = require('./StreamPlaceholder');
 const styles = require('./styles');
 
-const Stream = ({ className, addonName, name, description, thumbnail, progress, deepLinks, ...props }) => {
+const Stream = ({ className, videoId, videoReleased, addonName, name, description, thumbnail, progress, deepLinks, ...props }) => {
     const profile = useProfile();
     const streamingServer = useStreamingServer();
     const { core } = useServices();
@@ -29,10 +29,22 @@ const Stream = ({ className, addonName, name, description, thumbnail, progress, 
             :
             null;
     }, [deepLinks, profile, streamingServer]);
-    const onClick = React.useCallback((e) => {
+    const markVideoAsWatched = React.useCallback(() => {
+        if (typeof videoId === 'string') {
+            core.transport.dispatch({
+                action: 'MetaDetails',
+                args: {
+                    action: 'MarkVideoAsWatched',
+                    args: [{ id: videoId, released: videoReleased }, true]
+                }
+            });
+        }
+    }, [videoId, videoReleased]);
+    const onClick = React.useCallback((event) => {
         if (href === null) {
             // link does not lead to the player, it is expected to
             // open with local video player through the streaming server
+            markVideoAsWatched();
             core.transport.dispatch({
                 action: 'StreamingServer',
                 args: {
@@ -43,22 +55,25 @@ const Stream = ({ className, addonName, name, description, thumbnail, progress, 
                     }
                 }
             });
-        } else if (profile.settings.playerType === 'external') {
+        } else if (profile.settings.playerType && profile.settings.playerType !== 'internal') {
+            markVideoAsWatched();
             toast.show({
                 type: 'success',
                 title: 'Stream opened in external player',
                 timeout: 4000
             });
         }
-        props.onClick(e);
-    }, [href, deepLinks, props.onClick, profile, toast]);
+        if (typeof props.onClick === 'function') {
+            props.onClick(event);
+        }
+    }, [href, deepLinks, props.onClick, profile, toast, markVideoAsWatched]);
     const forceDownload = React.useMemo(() => {
         // we only do this in one case to force the download
         // of a M3U playlist generated in the browser
         return href === deepLinks.externalPlayer.href ? deepLinks.externalPlayer.fileName : false;
     }, [href]);
     const renderThumbnailFallback = React.useCallback(() => (
-        <Icon className={styles['placeholder-icon']} icon={'ic_broken_link'} />
+        <Icon className={styles['placeholder-icon']} name={'ic_broken_link'} />
     ), []);
     return (
         <Button href={href} download={forceDownload} {...props} onClick={onClick} className={classnames(className, styles['stream-container'])} title={addonName}>
@@ -95,6 +110,8 @@ Stream.Placeholder = StreamPlaceholder;
 
 Stream.propTypes = {
     className: PropTypes.string,
+    videoId: PropTypes.string,
+    videoReleased: PropTypes.instanceOf(Date),
     addonName: PropTypes.string,
     name: PropTypes.string,
     description: PropTypes.string,
@@ -107,48 +124,48 @@ Stream.propTypes = {
             fileName: PropTypes.string,
             streaming: PropTypes.string,
             openPlayer: PropTypes.shape({
-                choose: {
+                choose: PropTypes.shape({
                     ios: PropTypes.string,
                     android: PropTypes.string,
                     windows: PropTypes.string,
                     macos: PropTypes.string,
                     linux: PropTypes.string
-                },
-                vlc: {
+                }),
+                vlc: PropTypes.shape({
                     ios: PropTypes.string,
                     android: PropTypes.string,
                     windows: PropTypes.string,
                     macos: PropTypes.string,
                     linux: PropTypes.string
-                },
-                outplayer: {
+                }),
+                outplayer: PropTypes.shape({
                     ios: PropTypes.string,
                     android: PropTypes.string,
                     windows: PropTypes.string,
                     macos: PropTypes.string,
                     linux: PropTypes.string
-                },
-                infuse: {
+                }),
+                infuse: PropTypes.shape({
                     ios: PropTypes.string,
                     android: PropTypes.string,
                     windows: PropTypes.string,
                     macos: PropTypes.string,
                     linux: PropTypes.string
-                },
-                justplayer: {
+                }),
+                justplayer: PropTypes.shape({
                     ios: PropTypes.string,
                     android: PropTypes.string,
                     windows: PropTypes.string,
                     macos: PropTypes.string,
                     linux: PropTypes.string
-                },
-                mxplayer: {
+                }),
+                mxplayer: PropTypes.shape({
                     ios: PropTypes.string,
                     android: PropTypes.string,
                     windows: PropTypes.string,
                     macos: PropTypes.string,
                     linux: PropTypes.string
-                },
+                }),
             })
         })
     }),
